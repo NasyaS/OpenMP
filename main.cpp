@@ -6,7 +6,6 @@
 #include <chrono>
 #include <stdexcept>
 #include <sstream>
-#include <cmath>
 
 using namespace std;
 vector<double> random_parallel(size_t size);
@@ -141,177 +140,36 @@ void Test(size_t t, size_t d, double time) {
 	cout << t << "," << d << "," << time << endl;
 }
 
-string test2(Matrix &matrix,double time,double iters){ 
-	stringstream outStream;
 
-  for (size_t i = 0; i < matrix.rows(); ++i) {
-
-    for (size_t j = 0; j < matrix.cols(); ++j) {
-
-      if(j==matrix.cols()-1){
-
-        outStream << matrix(i, j) << "";
-      }
-      else{
-
-        outStream << matrix(i, j) << ",";
-      }
-      
-    }
-    outStream<<endl;
-  }
-  outStream<<time<<","<<iters<<endl;
-  return outStream.str();
-
-}
-
-double F(double x,double y){
-
-	return 0;
-}
-double G(double x,double y){
-
-	if(x==0)return 1;
-	if(x==1)return exp(y);
-	if(y==0)return 1;
-	if(y==1)return exp(x);
-	else return 0;
-	return 0;
-	
-}
-
-
-size_t dirichletProblem(Matrix &u,Matrix &f,size_t N,double epsilon){
-
-	double h=1.0/(N+1);
-	size_t iters=0;
-	double max=0;
-	double delta=0;
-	double t1=0;
-	for(size_t i=0;i<N;++i){
-
-		for(size_t j=0;j<N;++j)
-
-			f(i,j)=F((i+1)*h,(j+1)*h);
-			
-		
-	}
-
-	for(size_t i=1;i<N+1;++i){
-
-		u(i,0)=G(h*i,0);
-		u(i,N+1)=G(i*h,(N+1)*h);
-		
-	}	
-
-	for(size_t j=0;j<N+2;++j){
-		
-		u(0,j)=G(0,j*h);
-		u(N+1,j)=G((N+1)*h,j*h);
-		
-	}		
-
-	do {
-		iters++;
-		max=0;
-		for(size_t i=1;i<N+1;++i)
-			for(size_t j=1;j<N+1;++j){
-
-				t1=u(i,j);
-				u(i,j)=0.25*(u(i-1, j) + u(i+1, j) + u(i, j-1) + u(i, j+1) - h*h*f(i - 1, j - 1));
-				delta=fabs(u(i,j)-t1);
-				if (delta>max) {
-
-					max=delta;
-				}
-						
-	
-					
-		}	
-
-	}while(max>epsilon);
-
-	return iters;
-}
-
-
-size_t dirichletProblemParallel(Matrix &u,Matrix &f,size_t N,double epsilon){
-
-	double h=1.0/(N+1);
-	size_t iters=0;
-	double max=0;
-	double delta=0;
-	double t1=0;
-	for(size_t i=0;i<N;++i){
-
-		for(size_t j=0;j<N;++j)
-
-			f(i,j)=F((i+1)*h,(j+1)*h);
-			
-		
-	}
-
-	for(size_t i=1;i<N+1;++i){
-
-		u(i,0)=G(h*i,0);
-		u(i,N+1)=G(i*h,(N+1)*h);
-		
-	}	
-
-	for(size_t j=0;j<N+2;++j){
-		
-		u(0,j)=G(0,j*h);
-		u(N+1,j)=G((N+1)*h,j*h);
-		
-	}		
-	size_t j=0;
-	do {
-		iters++;
-		max=0;
-		#pragma omp parallel for private(j,t1) reduction (max:delta) 
-		for(size_t i=1;i<N+1;++i)
-			for(j=1;j<N+1;++j){
-
-				t1=u(i,j);
-				u(i,j)=0.25*(u(i-1, j) + u(i+1, j) + u(i, j-1) + u(i, j+1) - h*h*f(i - 1, j - 1));
-				delta=fabs(u(i,j)-t1);
-				if (delta>max) {
-
-					max=delta;
-				}
-						
-	
-					
-		}	
-
-	}while(max>epsilon);
-
-	return iters;
-}
 
 int main(int argc, char* argv[]){
 
-	size_t N = 99;
+	size_t rows = 4;
+	size_t cols = 4;	
+
 	if (argc > 1){
     istringstream ss(argv[1]);
     int dim;
     if (!(ss >> dim)){
       throw invalid_argument("Ошибка");
     } else {
-      N = dim;
+      rows = dim;
+      cols = dim;
 	    }
 	} 
-	double epsilon=0.0001;
-	Matrix u(N+2,N+2);
-	Matrix f(N,N);
+
 	auto firstTime = chrono::steady_clock::now();
 
-	// size_t iters=dirichletProblem(u,f,N,epsilon);
-	size_t iters=dirichletProblemParallel(u,f,N,epsilon);
+	Matrix X = Matrix::random(rows, cols);
+	Matrix Y = Matrix::random(rows, cols);
 	
+	Matrix Z = X*Y;
+
 	auto secondTime = chrono::steady_clock::now();
 
 	auto Time = chrono::duration_cast<chrono::duration<double>>(secondTime - firstTime);
-	cout<<test2(u,Time.count(),iters)<<endl;
+	Test(omp_get_max_threads(), rows, Time.count());
+
+
 	return 0;
 }
